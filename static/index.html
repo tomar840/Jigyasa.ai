@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang = "en">
+<head>
+    <meta charset = "UTF-8">
+    <meta name = "viewport" content = "width=device-width, initial-scale=1.0">
+    <title>Jigyasa - Dev</title>
+    <style>
+        body, html {
+            width: 100%;
+            height: 100%; /* Make sure the full height of the page is used */
+            margin: 0;
+            padding: 0; /* Reset padding to ensure consistent dimensions */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4; /* Light background color for better contrast */
+        }
+        #chatContainer {
+            width: 70%; /* Adjusted for a more proportional width */
+            min-width: 300px; /* Minimum width */
+            height: 80%; /* 80% of the viewport height */
+            max-height: 90vh; /* Adjust max-height to be within viewport height */
+            border: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-shadow: 0 0 10px #ccc;
+            background-color: #fff; /* White background for the container */
+            overflow: hidden; /* Prevent overflow */
+        }
+        #messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 5px; /* Padding inside the messages area */
+        }
+        #inputContainer {
+            display: flex;
+        }
+        input[type="text"], input[type="submit"] {
+            flex-grow: 1;
+            padding: 10px; /* Increased padding for better interaction */
+        }
+        input[type="submit"] {
+            flex-grow: 0;
+            margin-left: 5px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 8px; /* Adjust padding if necessary */
+            border-radius: 5px;
+            line-height: 1.5; /* Ensure line spacing is adequate */
+            word-wrap: break-word; /* Prevents long words or URLs from overflowing */
+        }
+
+        .user {
+            background-color: #b3d1ff; /* Very light blue for user messages */
+        }
+        .bot {
+            background-color: #ccffcc; /* Very light green for bot messages */
+        }
+        .error-bot {
+            background-color: #ffccdd; /* Very light red for bot messages */
+        }
+    </style>
+</head>
+<body>
+    <div id = "chatContainer">
+        <div id = "messages"></div>
+        <div id = "inputContainer">
+            <input type = "text" id = "userInput" placeholder = "Ask me something..." onkeydown = "handleEnter(event)">
+            <input type = "submit" id = "sendButton" value = "Send" onclick = "sendMessage()">
+        </div>
+    </div>
+
+    <script>
+        function sendMessage() {
+            var input = document.getElementById('userInput');
+            var sendButton = document.getElementById('sendButton');
+            var message = input.value;
+            input.value = '';
+            input.disabled = true;
+            sendButton.disabled = true;
+            addMessage(message, 'You');
+
+            // Function to start the SSE stream
+            function startStream(reply, container) {
+                const eventSource = new EventSource(`/stream_response`);
+                
+                eventSource.onmessage = function(event) {
+                    container.innerHTML += event.data;
+                };
+
+                eventSource.addEventListener('end', function(event) {
+                    // dataContainer.innerHTML += '<strong>' + event.data + '</strong>'; // Show a strong message that the stream ended
+                    eventSource.close(); // Close the connection since this is the end event
+                    input.disabled = false;
+                    sendButton.disabled = false;
+                });
+
+                eventSource.onerror = function(error) {
+                    console.error('EventSource failed:', error);
+                    eventSource.close();
+                    container.innerHTML += '<br><br>Stream ended due to an error!';
+                    container.classList.add('error-bot');
+                    input.disabled = false;
+                    sendButton.disabled = false;
+                };
+            }
+
+            fetch('http://localhost:6969/Jigyasaify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    addMessage(data.error, 'Jigyasa', true);  // Pass true if there is an error
+                    input.disabled = false;
+                    sendButton.disabled = false;
+                } else {
+                    addMessage("", 'Jigyasa');
+
+                    var messagesContainer = document.getElementById('messages');
+                    var allMessagesContainer = messagesContainer.getElementsByTagName('div');
+                    var lastMessagesContainer = allMessagesContainer[allMessagesContainer.length - 1];
+                    startStream(data.reply, lastMessagesContainer)
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                addMessage('Failed to get response due to a network or parsing error.', 'Jigyasa', true);
+                input.disabled = false;
+                sendButton.disabled = false;
+            });
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault(); // Prevent default to avoid a new line or form submit
+                sendMessage();
+            }
+        }
+        
+        function addMessage(message, sender, isError = false) {
+            var messagesContainer = document.getElementById('messages');
+            var msgDiv = document.createElement('div');
+            msgDiv.classList.add('message');
+            // Ensure class is applied correctly
+            if (isError) {
+                msgDiv.classList.add('error-bot');  // This class will be used for error messages
+            } else {
+                msgDiv.classList.add(sender === 'You' ? 'user' : 'bot');
+            }
+            // Replace new lines with <br> tags for HTML display
+            message = message.replace(/\n/g, '<br>');
+            msgDiv.innerHTML = sender + ': ' + message;  // Use innerHTML to interpret <br> as HTML
+            messagesContainer.appendChild(msgDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight; // Scroll to the bottom on new message
+        }
+    </script>
+</body>
+</html>
