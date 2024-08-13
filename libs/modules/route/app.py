@@ -1,7 +1,9 @@
-import streamlit as st
-import time
-import requests
 import json
+import time
+
+import requests
+import streamlit as st
+
 
 # Function to call the backend API (assuming it runs locally on port 8000)
 def query_backend(user_query):

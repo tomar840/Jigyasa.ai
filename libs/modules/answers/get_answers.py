@@ -1,29 +1,23 @@
-from dotenv import load_dotenv
-import os
 import datetime
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
 import json
+import os
 
-from web_search_api import WebSearcher
-from llm_engine import LLM_engine
-from prompts_dump import (
-    REPHRASE_QUERY_FOR_SEARCH_SYSTEM_PROMPT,
-    QUERY_REPHRASE_COMPLETION_PROMPT,
-    RESPONSE_FORMATION_SYSTEM_PROMPT,
-    USER_QUERY_ANSWER_COMPLETION_PROMPT,
-    CHAT_TEMPLATE,
-)
+from dotenv import load_dotenv
+
+from libs.modules.model_inference.engine import LLMEngine
+from libs.modules.prompts.model_prompts import (
+    CHAT_TEMPLATE, QUERY_REPHRASE_COMPLETION_PROMPT,
+    REPHRASE_QUERY_FOR_SEARCH_SYSTEM_PROMPT, RESPONSE_FORMATION_SYSTEM_PROMPT,
+    USER_QUERY_ANSWER_COMPLETION_PROMPT)
+from libs.modules.web_search.search import WebSearcher
 
 load_dotenv()
 
 GS_API_KEY = os.getenv("GS_API_KEY")
 GS_CSE_ID = os.getenv("GS_CSE_ID")
 
-app = FastAPI()
-
 # Initialize LLM Engine and Web Searcher
-llm_engine = LLM_engine()
+llm_engine = LLMEngine()
 web_search = WebSearcher()
 
 # To keep chat history
@@ -92,20 +86,3 @@ def generate_stream_response(user_query):
     # Send sources information
     for idx, url in idx_url_mapping.items():
         yield json.dumps({"message": {"content": f"[{idx}] - {url}"}}) + "\n"
-
-
-@app.get("/query")
-async def query(request: Request):
-    user_query = request.query_params.get("query", None)
-    if not user_query:
-        return {"error": "Query parameter is missing."}
-
-    return StreamingResponse(
-        generate_stream_response(user_query), media_type="application/json"
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)

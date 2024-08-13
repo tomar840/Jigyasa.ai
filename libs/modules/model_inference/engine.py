@@ -1,15 +1,15 @@
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
 import ollama
 
-
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
 
 
-class LLM_engine:
+class LLMEngine:
     def __init__(self):
         self.model_name = OLLAMA_MODEL
 
