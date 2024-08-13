@@ -22,19 +22,20 @@ To install ollama, follow instructions from this [repo](https://github.com/ollam
 ## Usage
 You can start the ollama inference server using instructions from this [repo](https://github.com/ollama/ollama).
 
-In a standalone terminal, run ollama inference server for your model
+In a standalone terminal, run ollama inference server for your model. We are using Llama3.1-Instruct model at the moment.
 ```
 ollama run llama3:8b-instruct-q8_0
 ```
 
-Run the below command to run the streamlit app
+Run the below commands to run the streamlit app
 ```
-streamlit run app.py
+python libs/modules/route/answer.py 
+streamlit run ./libs/modules/route/app.py 
 ```
 then go to `http://localhost:8501/`
 
 ## TODO
-- Restructure the code into modules
+- Tuning prompts for Llama-3.1-Instruct
 
 ## Contributing
 Contributions to improve the project are welcome. Please follow these steps to contribute:

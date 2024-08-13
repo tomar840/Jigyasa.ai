@@ -1,5 +1,3 @@
-import datetime
-
 REPHRASE_QUERY_FOR_SEARCH_SYSTEM_PROMPT = """
 You will be given a conversation below and a follow up question. You need to rephrase the follow-up question if needed so it is a standalone question that can be used by the user to yeild best search results on google.
 If it is a writing task or a simple hi, hello rather than a question / query, you need to return \`not_needed\` as the response.

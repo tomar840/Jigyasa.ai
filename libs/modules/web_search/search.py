@@ -1,10 +1,12 @@
-from googleapiclient.discovery import build
-import requests
-from readability import Document
-from bs4 import BeautifulSoup
-import re
 import concurrent.futures
+import re
 from queue import Queue
+from typing import Optional
+
+import requests
+from bs4 import BeautifulSoup
+from googleapiclient.discovery import build
+from readability import Document
 
 
 class WebSearcher:
@@ -15,7 +17,19 @@ class WebSearcher:
         self.session = requests.Session()
         self.session.headers.update(headers)
 
-    def get_clean_text_from_url(self, url, timeout=2):
+    def get_clean_text_from_url(self, url: str, timeout: int = 2) -> Optional[str]:
+        """Extract clean text from the specified url.
+
+        Args:
+            url (str): url to fetch the cleaned text
+            timeout (int, optional): timeout (in seconds). Defaults to 2.
+
+        Raises:
+            Exception: raise exception if status code is not 200
+
+        Returns:
+            Optional[str]: cleaned text
+        """
         try:
             response = self.session.get(url, timeout=timeout)
             if response.status_code != 200:
@@ -28,14 +42,30 @@ class WebSearcher:
             text = soup.get_text(separator="")
             text = re.sub(r"\n\s*\n\s*\n*", " \n\n ", text)
             return text.strip()
-        except requests.exceptions.RequestException as e:
-            # print(f"Request failed for {url}: {e}")
+        except requests.exceptions.RequestException:
             return None
-        except Exception as e:
-            # print(f"Failed to process {url}: {e}")
+        except Exception:
             return None
 
-    def google_search(self, search_term, api_key, cse_id, num_results=2, **kwargs):
+    def google_search(
+        self,
+        search_term: str,
+        api_key: str,
+        cse_id: str,
+        num_results: int = 2,
+        **kwargs,
+    ) -> str:
+        """Get search results from google search api.
+
+        Args:
+            search_term (str): search query
+            api_key (str): API key to use in google search API
+            cse_id (str): CSE id for custom google search
+            num_results (int, optional): number of results to fetch. Defaults to 2.
+
+        Returns:
+            str: search results
+        """
         service = build("customsearch", "v1", developerKey=api_key)
         res = (
             service.cse()
@@ -44,18 +74,30 @@ class WebSearcher:
         )
         return res["items"]
 
-    def form_articles(self, SEARCH_QUERIES, gs_api_key, gs_cse_id):
-        ARTICLES = ""
+    def form_articles(
+        self, search_queries: list[str], gs_api_key: str, gs_cse_id: str
+    ) -> str:
+        """Form the articles from the search queries.
+
+        Args:
+            search_queries (str): search queries
+            gs_api_key (str): API key to use in google search API
+            gs_cse_id (str): CSE id for custom google search
+
+        Returns:
+            str: formatted articles.
+        """
+        articles = ""
         article_idx = 1
 
-        SEARCH_QUERIES = [s for s in SEARCH_QUERIES if s != "not_needed"]
+        search_queries = [s for s in search_queries if s != "not_needed"]
 
         # len(SEARCH_QUERIES) can be one of [1, 2, 3] only
-        max_local_articles = 6 // len(SEARCH_QUERIES)
+        max_local_articles = 6 // len(search_queries)
 
-        num_results_for_search = 10 if len(SEARCH_QUERIES) == 1 else 5
+        num_results_for_search = 10 if len(search_queries) == 1 else 5
 
-        for qry in SEARCH_QUERIES:
+        for qry in search_queries:
             local_article_idx = 0
             results = self.google_search(
                 qry, gs_api_key, gs_cse_id, num_results=num_results_for_search
@@ -66,7 +108,7 @@ class WebSearcher:
                 content = self.get_clean_text_from_url(url)
                 if content:
                     content = content[:3500]
-                    ARTICLES += f"""<ARTICLE {article_idx}>\n{content}\n<\ARTICLE {article_idx}>\n\n"""
+                    articles += f"""<ARTICLE {article_idx}>\n{content}\n<\ARTICLE {article_idx}>\n\n"""
                     article_idx += 1
                     local_article_idx += 1
                     if local_article_idx == max_local_articles:
@@ -76,18 +118,30 @@ class WebSearcher:
                 break
 
         # Remove exiting [citation] marks from scraped articles
-        ARTICLES = re.sub(r"\[\d+\]", "", ARTICLES)
+        articles = re.sub(r"\[\d+\]", "", articles)
 
-        return ARTICLES
+        return articles
 
-    def form_articles_mp(self, SEARCH_QUERIES, gs_api_key, gs_cse_id):
+    def form_articles_mp(
+        self, search_queries: list[str], gs_api_key: str, gs_cse_id: str
+    ) -> tuple[str, dict[int, any]]:
+        """Get article map.
+
+        Args:
+            search_queries (list[str]): search queries
+            gs_api_key (str): API key to use in google search API
+            gs_cse_id (str): CSE id for custom google search
+
+        Returns:
+            tuple[str, dict[int, any]]: formatted articles and query index map
+        """
         articles_queue = Queue()
         article_idx = 1  # Start indexing from 1
 
-        SEARCH_QUERIES = [s for s in SEARCH_QUERIES if s != "not_needed"]
+        search_queries = [s for s in search_queries if s != "not_needed"]
 
-        max_local_articles = 6 // len(SEARCH_QUERIES)
-        num_results_for_search = 10 if len(SEARCH_QUERIES) == 1 else 5
+        max_local_articles = 6 // len(search_queries)
+        num_results_for_search = 10 if len(search_queries) == 1 else 5
 
         def process_query(qry):
             results = self.google_search(
@@ -116,20 +170,20 @@ class WebSearcher:
 
         # Process each query in parallel
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(process_query, SEARCH_QUERIES)
+            executor.map(process_query, search_queries)
 
         # Collect all articles from the queue and build index to URL map
-        ARTICLES = ""
+        artciles = ""
         idx_to_url = {}
         while not articles_queue.empty():
             content, url = articles_queue.get()
-            ARTICLES += (
+            artciles += (
                 f"<ARTICLE {article_idx}>\n{content}\n</ARTICLE {article_idx}>\n\n"
             )
             idx_to_url[article_idx] = url
             article_idx += 1
 
         # Remove existing [citation] marks from scraped articles
-        ARTICLES = re.sub(r"\[\d+\]", "", ARTICLES)
+        artciles = re.sub(r"\[\d+\]", "", artciles)
 
-        return ARTICLES, idx_to_url
+        return artciles, idx_to_url
