@@ -27,6 +27,8 @@ In a standalone terminal, run ollama inference server for your model. We are usi
 ollama run llama3:8b-instruct-q8_0
 ```
 
+[![Watch the video](https://drive.google.com/uc?export=view&id=1zTXL4TTe_ilhKOotBBajJcPRlV9YBf5Z)](https://drive.google.com/file/d/1neo_H1jrsQXm1lnxp5kKM2oXw9kQ4set/view?usp=sharing)
+
 Run the below commands to run the streamlit app
 ```
 python libs/modules/route/answer.py 
